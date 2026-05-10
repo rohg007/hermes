@@ -17,9 +17,25 @@ import type {
 const DEFAULT_BATCH_SIZE = 8;
 const DEFAULT_WAIT_MS = 50;
 const DEFAULT_MAX_TOKENS = 512;
+const DEFAULT_CHAT_STOP_SEQUENCES = [
+  '\nUser:',
+  '\nSystem:',
+  '\nAssistant:',
+  '\nResponse:',
+  '\nInstruction:',
+  '<|user|>',
+  '<|system|>',
+  '<|assistant|>',
+  '<|eot_id|>',
+  '<|end_of_text|>',
+];
 
 function normalizeStopSequences(stopSequences: string[] | undefined): string[] {
   return Array.from(new Set((stopSequences ?? []).filter((sequence) => sequence.length > 0)));
+}
+
+function mergeChatStopSequences(stopSequences: string[] | undefined): string[] {
+  return normalizeStopSequences([...(stopSequences ?? []), ...DEFAULT_CHAT_STOP_SEQUENCES]);
 }
 
 function earliestStopIndex(text: string, stopSequences: string[]): number {
@@ -265,10 +281,14 @@ export class BitNetModel {
    */
   async *chat(params: ChatGenerationParams): AsyncIterable<string> {
     const { messages, ...generationParams } = params;
+    const chatGenerationParams = {
+      ...generationParams,
+      stopSequences: mergeChatStopSequences(generationParams.stopSequences),
+    };
     const nativeChat = buildNativeChatPrompt(messages);
     if (nativeChat) {
       yield* this.generate({
-        ...generationParams,
+        ...chatGenerationParams,
         ...nativeChat,
         promptMode: 'chat',
       });
@@ -276,7 +296,7 @@ export class BitNetModel {
     }
 
     yield* this.generate({
-      ...generationParams,
+      ...chatGenerationParams,
       prompt: buildChatPrompt(messages),
       promptMode: 'raw',
     });

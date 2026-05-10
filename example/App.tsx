@@ -121,7 +121,7 @@ export default function App() {
         topP: 0.9,
         maxTokens: Platform.OS === 'web' ? 128 : 64,
         repeatPenalty: 1.1,
-        stopSequences: ['\nUser:', '\nSystem:'],
+        stopSequences: ['\nUser:', '\nSystem:', '\nAssistant:', '\nResponse:'],
       })) {
         setMessages((current) =>
           current.map((message) =>
