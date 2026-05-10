@@ -1,0 +1,171 @@
+buildscript {
+  repositories {
+    google()
+    mavenCentral()
+  }
+  dependencies {
+    classpath("com.android.tools.build:gradle:8.7.3")
+  }
+}
+
+import groovy.json.JsonSlurper
+import java.util.Locale
+
+apply plugin: "com.android.library"
+apply plugin: "com.facebook.react"
+
+react {
+  libraryName = "RNBitNetSpec"
+  codegenJavaPackageName = "com.bitnetrn"
+}
+
+def bitnetTruthy = { value ->
+  if (value == null) {
+    return false
+  }
+  def normalized = value.toString().trim().toLowerCase(Locale.ROOT)
+  return normalized == "1" || normalized == "true" || normalized == "yes" || normalized == "on"
+}
+
+def bitnetConfigFile = {
+  def explicit = project.findProperty("bitnetConfig") ?: System.getenv("BITNET_CONFIG")
+  def candidates = []
+  if (explicit != null && explicit.toString().trim()) {
+    candidates << file(explicit.toString())
+  }
+  candidates += [
+    new File(rootProject.rootDir, "../bitnet.config.json"),
+    new File(rootProject.rootDir, "../../bitnet.config.json"),
+    new File(rootProject.rootDir, "bitnet.config.json"),
+    new File(projectDir, "../bitnet.config.json"),
+    new File(projectDir, "bitnet.config.json")
+  ]
+  return candidates.find { it.exists() && it.isFile() }
+}.call()
+
+def bitnetConfig = [:]
+if (bitnetConfigFile != null) {
+  bitnetConfig = new JsonSlurper().parse(bitnetConfigFile) as Map
+  logger.lifecycle("[BitNet] Using config ${bitnetConfigFile}")
+}
+
+def bitnetResolvePath = { raw ->
+  if (raw == null || !raw.toString().trim()) {
+    return ""
+  }
+  def resolved = new File(raw.toString())
+  if (!resolved.isAbsolute() && bitnetConfigFile != null) {
+    resolved = new File(bitnetConfigFile.parentFile, raw.toString())
+  }
+  return resolved.canonicalPath
+}
+
+def bitnetHasCmake = { dir ->
+  new File(dir, "CMakeLists.txt").exists()
+}
+
+def bitnetIsComplete = { dir ->
+  bitnetHasCmake(dir) && new File(dir, "include/bitnet-lut-kernels.h").exists()
+}
+
+def bitnetCandidateDirs = {
+  def candidates = []
+  def explicit = project.findProperty("bitnetCppDir") ?: System.getenv("BITNET_CPP_DIR") ?: bitnetConfig.bitnetPath
+  if (explicit != null && explicit.toString().trim()) {
+    candidates << bitnetResolvePath(explicit)
+  }
+  candidates += [
+    new File(rootProject.rootDir, "../third_party/BitNet").canonicalPath,
+    new File(rootProject.rootDir, "../../third_party/BitNet").canonicalPath,
+    new File(rootProject.rootDir, "../BitNet").canonicalPath,
+    new File(rootProject.rootDir, "../../BitNet").canonicalPath,
+    new File(projectDir, "../third_party/BitNet").canonicalPath
+  ]
+  return candidates.unique()
+}.call()
+
+def bitnetStub = project.findProperty("bitnetRnEnableStub") ?:
+  System.getenv("BITNET_RN_ENABLE_STUB") ?:
+  bitnetConfig.enableStub ?:
+  bitnetConfig.stub ?:
+  "OFF"
+def bitnetEnableGpu = project.findProperty("ENABLE_GPU") ?:
+  project.findProperty("enableGpu") ?:
+  System.getenv("ENABLE_GPU") ?:
+  bitnetConfig.enableGPU ?:
+  bitnetConfig.enableGpu ?:
+  "false"
+def bitnetEnableGpuCmake = bitnetTruthy(bitnetEnableGpu) ? "ON" : "OFF"
+def bitnetStubCmake = bitnetTruthy(bitnetStub) ? "ON" : "OFF"
+def bitnetMinSdk = bitnetEnableGpuCmake == "ON" ? 28 : 24
+def bitnetExplicitCppDir = gradle.startParameter.projectProperties.containsKey("bitnetCppDir") ||
+  (System.getenv("BITNET_CPP_DIR") != null && System.getenv("BITNET_CPP_DIR").toString().trim())
+def bitnetUseStubOnly = bitnetTruthy(project.findProperty("bitnetUseStubOnly") ?: bitnetConfig.useStubOnly ?: "false")
+
+if (bitnetUseStubOnly && bitnetStubCmake == "ON" && !bitnetExplicitCppDir) {
+  bitnetCandidateDirs = []
+}
+
+def bitnetCppDir = bitnetCandidateDirs.find { bitnetIsComplete(it) } ?: ""
+def bitnetIncompleteDir = bitnetCppDir ? "" : (bitnetCandidateDirs.find { bitnetHasCmake(it) } ?: "")
+
+if (bitnetCppDir) {
+  logger.lifecycle("[BitNet] Using BitNet.cpp checkout ${bitnetCppDir}")
+} else if (bitnetUseStubOnly && bitnetStubCmake == "ON" && !bitnetExplicitCppDir) {
+  logger.lifecycle("[BitNet] Using deterministic stub backend because bitnetUseStubOnly is enabled.")
+} else if (bitnetIncompleteDir && bitnetStubCmake == "ON") {
+  logger.lifecycle("[BitNet] BitNet.cpp checkout at ${bitnetIncompleteDir} is incomplete; using deterministic stub backend.")
+} else if (bitnetIncompleteDir) {
+  throw new GradleException("[BitNet] BitNet.cpp checkout at ${bitnetIncompleteDir} is missing include/bitnet-lut-kernels.h. Run `yarn bitnet:setup --update`, fix bitnet.config.json bitnetPath, or enable the deterministic stub for smoke tests.")
+} else if (bitnetStubCmake == "ON") {
+  logger.lifecycle("[BitNet] BitNet.cpp checkout was not found; using deterministic stub backend.")
+} else {
+  logger.warn("[BitNet] BitNet.cpp checkout was not found. Searched: ${bitnetCandidateDirs.join(", ")}. Set bitnet.config.json bitnetPath, -PbitnetCppDir, or BITNET_CPP_DIR.")
+}
+
+android {
+  namespace "com.bitnetrn"
+  compileSdk 35
+
+  defaultConfig {
+    // llama.cpp's Vulkan backend references Vulkan 1.1 entry points that the
+    // NDK exports from API 28. CPU builds keep the wider API 24 floor.
+    minSdk bitnetMinSdk
+    targetSdk 35
+
+    externalNativeBuild {
+      cmake {
+        cppFlags "-std=c++17 -fexceptions -frtti"
+        arguments "-DBITNET_CPP_DIR=${bitnetCppDir}",
+          "-DBITNET_RN_ENABLE_STUB=${bitnetStubCmake}",
+          "-DENABLE_GPU=${bitnetEnableGpuCmake}",
+          "-DANDROID_STL=c++_shared"
+      }
+    }
+    ndk {
+      abiFilters "arm64-v8a"
+    }
+  }
+
+  externalNativeBuild {
+    cmake {
+      path "src/main/cpp/CMakeLists.txt"
+      version "3.22.1"
+    }
+  }
+
+  sourceSets {
+    main {
+      java.srcDirs += ["src/main/java"]
+    }
+  }
+}
+
+repositories {
+  google()
+  mavenCentral()
+}
+
+dependencies {
+  compileOnly("com.facebook.react:react-android")
+}

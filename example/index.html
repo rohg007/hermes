@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>BitNet Example</title>
+    <style>
+      html,
+      body,
+      #root {
+        background: #f7f8fb;
+        height: 100%;
+        margin: 0;
+      }
+
+      body {
+        overflow: hidden;
+      }
+
+      #root,
+      #root > div {
+        display: flex;
+        flex-direction: column;
+        min-height: 100%;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/index.web.tsx"></script>
+  </body>
+</html>

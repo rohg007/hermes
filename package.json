@@ -1,0 +1,82 @@
+{
+  "name": "@bitnet/react-native",
+  "version": "0.1.0",
+  "description": "React Native SDK for on-device BitNet.cpp inference.",
+  "main": "lib/commonjs/index.js",
+  "module": "lib/module/index.js",
+  "types": "lib/typescript/index.d.ts",
+  "source": "src/index.ts",
+  "files": [
+    "android",
+    "cpp",
+    "ios",
+    "lib",
+    "patches",
+    "scripts",
+    "src",
+    "web",
+    "BitNet.podspec",
+    "bitnet.config.example.json",
+    "react-native.config.js",
+    "README.md"
+  ],
+  "bin": {
+    "bitnet": "./scripts/bitnet-cli.js"
+  },
+  "scripts": {
+    "bitnet:init": "node ./scripts/bitnet-cli.js init",
+    "bitnet:setup": "node ./scripts/bitnet-setup.js",
+    "bitnet:doctor": "node ./scripts/bitnet-cli.js doctor",
+    "example:android": "yarn --cwd example android",
+    "example:android:gpu": "yarn --cwd example android:gpu",
+    "typecheck": "tsc --noEmit",
+    "build": "bob build",
+    "build:web:wasm": "./scripts/build-web-wasm.sh",
+    "clean": "rimraf lib android/build ios/build"
+  },
+  "keywords": [
+    "react-native",
+    "bitnet",
+    "llm",
+    "on-device",
+    "jsi",
+    "turbomodule"
+  ],
+  "license": "MIT",
+  "peerDependencies": {
+    "react": "*",
+    "react-native": ">=0.76.0"
+  },
+  "devDependencies": {
+    "@react-native-community/cli": "^18.0.0",
+    "@react-native/codegen": "^0.82.0",
+    "@types/react": "^19.2.14",
+    "react": "19.1.1",
+    "react-native": "^0.82.0",
+    "react-native-builder-bob": "^0.40.13",
+    "rimraf": "^6.0.1",
+    "typescript": "^5.8.3"
+  },
+  "react-native-builder-bob": {
+    "source": "src",
+    "output": "lib",
+    "targets": [
+      "commonjs",
+      "module",
+      [
+        "typescript",
+        {
+          "project": "tsconfig.json"
+        }
+      ]
+    ]
+  },
+  "codegenConfig": {
+    "name": "RNBitNetSpec",
+    "type": "modules",
+    "jsSrcsDir": "src/specs",
+    "android": {
+      "javaPackageName": "com.bitnetrn"
+    }
+  }
+}

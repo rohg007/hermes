@@ -1,0 +1,60 @@
+diff --git a/include/gemm-config.h b/include/gemm-config.h
+--- a/include/gemm-config.h
++++ b/include/gemm-config.h
+@@
+ #endif // __ARM_FEATURE_DOTPROD
++#else
++    // BitNet RN WASM scalar fallback.
++    #define ROW_BLOCK_SIZE 1
++    #define COL_BLOCK_SIZE 128
++    #define PARALLEL_SIZE 1
+ #endif // __AVX__
+ 
+diff --git a/src/ggml-bitnet-mad.cpp b/src/ggml-bitnet-mad.cpp
+--- a/src/ggml-bitnet-mad.cpp
++++ b/src/ggml-bitnet-mad.cpp
+@@
+ #if defined(__AVX__) || defined(__AVX2__) || defined(__AVX512F__) || defined(__SSSE3__)
+ #define QK_I2_S 128
+ #elif defined(__ARM_NEON)
+ #define QK_I2_S 64
++#else
++#define QK_I2_S 128
+ #endif
+@@
+ void ggml_vec_dot_i2_i8_s(int n, float * s, size_t bs, const void * vx, size_t bx, const void * vy, size_t by, int nrc) {
++#if !defined(__AVX2__) && !defined(__ARM_NEON)
++    // BitNet RN WASM scalar fallback. This preserves correctness on wasm32
++    // where BitNet.cpp does not currently provide AVX/NEON kernels.
++    const uint8_t * x = (const uint8_t *) vx;
++    const int8_t * y = (const int8_t *) vy;
++    const size_t x_row_stride = bx == 0 ? (size_t) ((n + 3) / 4) : bx / 4;
++    const size_t y_row_stride = by == 0 ? 0 : by;
++
++    for (int row = 0; row < nrc; row++) {
++        const uint8_t * x_row = x + row * x_row_stride;
++        const int8_t * y_row = y + row * y_row_stride;
++        int64_t sum = 0;
++
++        for (int i = 0; i < n; i++) {
++            const int block_offset = i % QK_I2_S;
++            const int byte_offset = (i / QK_I2_S) * 32 + (block_offset % 32);
++            const int lane = block_offset / 32;
++            const uint8_t code = (x_row[byte_offset] >> (6 - 2 * lane)) & 0x03;
++            sum += (int) code * (int) y_row[i];
++        }
++
++        s[row] = (float) sum;
++    }
++    (void) bs;
++    return;
++#else
+     if (nrc % PARALLEL_SIZE == 0)
+     {
+ #if defined(ACT_PARALLEL)
+@@
+     {
+         ggml_vec_dot_i2_i8_s_1x1(n, s, bs, vx, bx, vy, by, nrc);
+     }
++#endif
+ }

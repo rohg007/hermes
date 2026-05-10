@@ -1,0 +1,12 @@
+{
+  "bitnetPath": "./third_party/BitNet",
+  "enableGPU": false,
+  "enableStub": false,
+  "web": {
+    "wasmModuleUrl": "/bitnet_wasm.js"
+  },
+  "ios": {
+    "bitnetStaticLib": "",
+    "bitnetStaticLibs": []
+  }
+}

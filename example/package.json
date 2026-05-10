@@ -1,0 +1,31 @@
+{
+  "name": "BitNetExample",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "android": "node ./scripts/run-android.js",
+    "android:gpu": "node ./scripts/run-android.js --gpu",
+    "ios": "node ./scripts/run-ios.js",
+    "start": "react-native start",
+    "preweb": "node ./scripts/ensure-web-wasm.js",
+    "web": "vite --host 127.0.0.1",
+    "prebuild:web": "node ./scripts/ensure-web-wasm.js",
+    "build:web": "vite build",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@bitnet/react-native": "file:..",
+    "react": "19.1.1",
+    "react-dom": "19.1.1",
+    "react-native": "^0.82.0",
+    "react-native-web": "^0.21.2"
+  },
+  "devDependencies": {
+    "@react-native/babel-preset": "^0.82.0",
+    "@react-native/metro-config": "^0.82.0",
+    "@types/react": "^19.2.14",
+    "@vitejs/plugin-react": "^6.0.1",
+    "typescript": "^6.0.3",
+    "vite": "^8.0.11"
+  }
+}
