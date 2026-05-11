@@ -4,6 +4,18 @@ Production-ready local BitNet.cpp inference for React Native and Web: CPU-first 
 
 The SDK is designed to avoid adding overhead on top of BitNet.cpp rather than attempting to optimize the inference engine itself.
 
+## Contents
+
+- [Quick Start](#quick-start)
+- [Use In Your App](#use-in-your-app)
+- [How It Works](#how-it-works)
+- [Default Behavior](#default-behavior)
+- [Optional Controls](#optional-controls)
+- [Requirements](#requirements)
+- [Common Pitfalls](#common-pitfalls)
+- [Advanced](#advanced)
+- [Repository Layout](#repository-layout)
+
 ## Quick Start
 
 1. Install dependencies.
