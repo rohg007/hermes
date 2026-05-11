@@ -1,7 +1,9 @@
 import NativeBitNet from './native/NativeBitNet';
 import { fromNativeError, InferenceCancelledError, ModelNotFoundError } from './errors';
+import { getBitNetConfig } from './config';
 import { getBitNetLogger, normalizeMetrics } from './logger';
 import { parseNativeJson, stringifyNativeJson } from './nativeJson';
+import { logPerformanceAuditMetrics } from './performanceAudit';
 import type {
   BitNetMetrics,
   BitNetResolvedRuntime,
@@ -303,6 +305,9 @@ export class BitNetModel {
   }
 
   private emitMetrics(metrics: BitNetMetrics): void {
+    if (getBitNetConfig().performanceAudit) {
+      logPerformanceAuditMetrics(metrics);
+    }
     for (const listener of this.metricsListeners) {
       listener(metrics);
     }

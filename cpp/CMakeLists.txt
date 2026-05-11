@@ -4,8 +4,17 @@ project(bitnetrn_core LANGUAGES C CXX)
 
 option(BITNET_RN_ENABLE_STUB "Enable deterministic non-production backend for tests." OFF)
 option(ENABLE_GPU "Enable conditional BitNet GPU runtime integration." OFF)
+option(BITNET_RN_OPTIMIZE_NATIVE "Use release-style optimization flags for native benchmark builds." ON)
 set(BITNET_CPP_DIR "" CACHE PATH "Path to a local microsoft/BitNet checkout.")
 set(BITNET_CPP_REQUIRED_HEADER "include/bitnet-lut-kernels.h")
+
+if(BITNET_RN_OPTIMIZE_NATIVE)
+  message(STATUS "BitNet RN native optimization enabled")
+  string(APPEND CMAKE_C_FLAGS_DEBUG " -O3 -DNDEBUG")
+  string(APPEND CMAKE_CXX_FLAGS_DEBUG " -O3 -DNDEBUG")
+  string(APPEND CMAKE_C_FLAGS_RELWITHDEBINFO " -O3 -DNDEBUG")
+  string(APPEND CMAKE_CXX_FLAGS_RELWITHDEBINFO " -O3 -DNDEBUG")
+endif()
 
 set(BITNET_RN_CORE_SOURCES
   src/bitnet_engine.cpp

@@ -37,6 +37,11 @@ export interface BitNetConfiguration {
    */
   webDebug?: boolean;
   /**
+   * Enables lightweight performance audit logs during model load and generation.
+   * Useful when tuning CPU threads, SIMD builds, and first-token latency.
+   */
+  performanceAudit?: boolean;
+  /**
    * Reserved for pthread-enabled WASM builds. Keep false unless the WASM
    * runtime was built with the matching thread setting.
    */
@@ -55,6 +60,7 @@ export interface RuntimeCapabilities {
     arch: string;
     neon: boolean;
     avx2: boolean;
+    wasmSimd?: boolean;
     threadCount: number;
   };
   gpu: {

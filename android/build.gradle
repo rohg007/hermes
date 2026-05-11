@@ -97,7 +97,10 @@ def bitnetEnableGpu = project.findProperty("ENABLE_GPU") ?:
   "false"
 def bitnetEnableGpuCmake = bitnetTruthy(bitnetEnableGpu) ? "ON" : "OFF"
 def bitnetStubCmake = bitnetTruthy(bitnetStub) ? "ON" : "OFF"
-def bitnetMinSdk = bitnetEnableGpuCmake == "ON" ? 28 : 24
+def bitnetNativeOptimize = project.findProperty("bitnetNativeOptimize") ?:
+  System.getenv("BITNET_NATIVE_OPTIMIZE") ?:
+  (bitnetConfig.containsKey("nativeOptimize") ? bitnetConfig.nativeOptimize : "true")
+def bitnetNativeOptimizeCmake = bitnetTruthy(bitnetNativeOptimize) ? "ON" : "OFF"
 def bitnetExplicitCppDir = gradle.startParameter.projectProperties.containsKey("bitnetCppDir") ||
   (System.getenv("BITNET_CPP_DIR") != null && System.getenv("BITNET_CPP_DIR").toString().trim())
 def bitnetUseStubOnly = bitnetTruthy(project.findProperty("bitnetUseStubOnly") ?: bitnetConfig.useStubOnly ?: "false")
@@ -128,9 +131,9 @@ android {
   compileSdk 35
 
   defaultConfig {
-    // llama.cpp's Vulkan backend references Vulkan 1.1 entry points that the
-    // NDK exports from API 28. CPU builds keep the wider API 24 floor.
-    minSdk bitnetMinSdk
+    // Keep one Android floor for CPU and optional GPU builds. API 28 avoids
+    // ambiguity around Vulkan 1.1 symbols while preserving a stable CPU path.
+    minSdk 28
     targetSdk 35
 
     externalNativeBuild {
@@ -139,6 +142,7 @@ android {
         arguments "-DBITNET_CPP_DIR=${bitnetCppDir}",
           "-DBITNET_RN_ENABLE_STUB=${bitnetStubCmake}",
           "-DENABLE_GPU=${bitnetEnableGpuCmake}",
+          "-DBITNET_RN_OPTIMIZE_NATIVE=${bitnetNativeOptimizeCmake}",
           "-DANDROID_STL=c++_shared"
       }
     }

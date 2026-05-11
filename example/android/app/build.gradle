@@ -3,20 +3,6 @@ plugins {
   id("com.facebook.react")
 }
 
-def bitnetTruthy = { value ->
-  if (value == null) {
-    return false
-  }
-  def normalized = value.toString().trim().toLowerCase()
-  return normalized == "1" || normalized == "true" || normalized == "yes" || normalized == "on"
-}
-
-def bitnetEnableGpu = project.findProperty("ENABLE_GPU") ?:
-  project.findProperty("enableGpu") ?:
-  System.getenv("ENABLE_GPU") ?:
-  "false"
-def bitnetAndroidMinSdk = bitnetTruthy(bitnetEnableGpu) ? 28 : 24
-
 react {
   autolinkLibrariesWithApp()
 }
@@ -27,9 +13,8 @@ android {
 
   defaultConfig {
     applicationId "com.bitnetexample"
-    // Android GPU builds use llama.cpp's Vulkan backend, which links Vulkan 1.1
-    // entry points exported by the NDK from API 28. CPU builds retain API 24.
-    minSdk bitnetAndroidMinSdk
+    // Match the SDK floor: one API level for CPU and optional GPU builds.
+    minSdk 28
     targetSdk 36
     versionCode 1
     versionName "1.0"

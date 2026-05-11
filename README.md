@@ -86,7 +86,7 @@ for await (const token of model.chat({
 - Selects thread count automatically.
 - One generation can run per loaded model.
 - SDK generation defaults to `maxTokens: 512`.
-- The example app caps output at 128 tokens on Web and 64 tokens on mobile.
+- The example app caps output at 128 tokens on Web and 64 tokens on mobile, with a Stop button for manual cancellation.
 - Models stay loaded until `model.unload()`.
 - Web inference runs inside a Web Worker.
 - Needs no runtime config for the recommended model.
@@ -180,9 +180,66 @@ model.onMetrics((metrics) => {
 
 `promptTokens` is optional. It is reported by the BitNet.cpp backend after native prompt tokenization and omitted by fallback backends that cannot compute it reliably.
 
+### Benchmarking Metrics
+
+Use these fields when comparing devices, runtimes, thread counts, or prompt lengths:
+
+| Metric | Field / formula | What it tells you |
+| --- | --- | --- |
+| Time to first token | `firstTokenLatencyMs` | Prompt processing plus first decode step. This is the main responsiveness metric. |
+| Tokens per second | `tokensPerSecond` | Decode throughput after generation starts. Higher is better. |
+| Total latency | `latencyMs` | End-to-end generation time for the request. |
+| Inter-token latency / TPOT | `(latencyMs - firstTokenLatencyMs) / generatedTokens` | Approximate average delay between streamed tokens. |
+| Prompt tokens | `promptTokens` | Prompt size after native tokenization, when available. Larger prompts increase first-token latency. |
+| Memory usage | `memoryUsageMB` | Approximate resident memory used by the backend. |
+| Thread count | `threadCount` | Native decode threads used for the run. Useful for mobile thread tuning. |
+| Runtime used | `runtimeUsed` | Confirms whether the run used CPU, GPU, or fallback. |
+
+For repeatable benchmarks, keep the model, prompt, `maxTokens`, `temperature`, runtime, and thread count fixed. Run one warm-up generation before recording numbers.
+
+Recent audit numbers with the recommended I2_S model, prompt `Say hello`, `maxTokens: 64`, and CPU runtime:
+
+| Platform / build | Context | Threads | TTFT | Total latency | TPS | Memory |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Pixel 7 Android debug, native unoptimized | 2048 | 2 | 55.3s | 445.9s | 0.14 | 1458 MB |
+| Pixel 7 Android debug, native optimized | 2048 | 1 | 9.8s | 39.8s | 1.61 | 1625 MB |
+| Pixel 7 Android debug, native optimized | 2048 | 2 | 8.2s | 37.6s | 1.70 | 1634 MB |
+| Pixel 7 Android debug, native optimized | 2048 | 4 | 9.3s | 41.7s | 1.54 | 1628 MB |
+| Pixel 7 Android debug, native optimized | 512 | 2 | 8.9s | 99.7s | 0.64 | 1477 MB |
+| iPhone 17 Pro simulator, iOS 26.4, Apple M3 Pro host | 2048 | 1 | 33.2s | 142.0s | 0.5 | 1608 MB |
+| iPhone 17 Pro simulator, iOS 26.4, Apple M3 Pro host | 2048 | 2 | 17.0s | 74.8s | 0.9 | 1525 MB |
+| iPhone 17 Pro simulator, iOS 26.4, Apple M3 Pro host | 2048 | 4 | 9.1s | 38.8s | 1.6 | 1675 MB |
+| iPhone 17 Pro simulator, iOS 26.4, Apple M3 Pro host | 512 | 2 | 16.7s | 72.7s | 0.9 | 1447 MB |
+| Web browser, WASM SIMD, Apple M3 Pro host | 512 | 1 | 68.6s | 96.9s | 0.09 | n/a |
+
+The best measured Android demo default is currently `threads: 2` with `contextSize: 2048`. More threads were slower on Pixel 7 because BitNet decode is memory-bandwidth bound, and the smaller context reduced memory but hurt throughput for this run.
+
+The iOS simulator sweep shows the host M3 Pro scaling well up to 4 threads in this debug setup. Simulator numbers are useful for integration checks, but they are not a substitute for physical iPhone performance measurements.
+
+The Web run used single-threaded WASM SIMD and stopped naturally after 9 generated tokens, so its TPS is not directly comparable to mobile runs that hit the `maxTokens` limit. Browser memory is not reported reliably yet.
+
+### Performance Audit
+
+Enable audit logs when tuning hardware acceleration or thread count:
+
+```ts
+BitNet.configure({ performanceAudit: true });
+```
+
+Audit mode logs the selected runtime, model hints, CPU architecture, SIMD path (`neon`, `avx2`, or `wasm-simd`), hardware thread count, GPU availability reason, tokens/sec, first-token latency, memory, and threads used. It is off by default and does not change inference behavior.
+
+Android native optimization is enabled by default, including debug app builds. This keeps Metro/debug logging usable without running BitNet.cpp and ggml at `-O0`.
+
+Disable it only when stepping through native C++:
+
+```sh
+cd example/android
+./gradlew :app:installDebug -PbitnetNativeOptimize=OFF
+```
+
 ## Requirements
 
-- Android: `arm64-v8a`, minSdk 24, Android Studio NDK/CMake.
+- Android: `arm64-v8a`, minSdk 28, Android Studio NDK/CMake.
 - iOS: arm64 device or simulator, iOS 13.4+, Xcode, CocoaPods.
 - Web: WASM-compatible browser. Emscripten is needed only when building the local web runtime.
 - Memory: budget roughly 2-4 GB free RAM and enough disk for the model plus a temporary download.
@@ -194,7 +251,7 @@ model.onMetrics((metrics) => {
 - `BITNET_MODEL_INCOMPATIBLE`: use a BitNet GGUF, not a generic GGUF.
 - iOS pod/link errors: rerun `yarn bitnet:init`, then `cd example && yarn ios`.
 - Web WASM missing: rerun `cd example && yarn web`. The example builds `bitnet_wasm.*` when needed.
-- Gibberish output: verify the same model in upstream BitNet.cpp first. The SDK does not patch model/runtime regressions.
+- Gibberish output: verify the same model in upstream BitNet.cpp first. The SDK does not patch model/runtime regressions; use low `maxTokens` and `abortSignal`/Stop to guard runaway output.
 
 ## Advanced
 

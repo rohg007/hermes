@@ -7,6 +7,7 @@ export type WebRuntimeCapabilities = {
     arch: string;
     neon: boolean;
     avx2: boolean;
+    wasmSimd?: boolean;
     threadCount: number;
   };
   gpu: {
@@ -66,6 +67,7 @@ export function detectWebRuntimeCapabilities(scope: WebRuntimeScope = globalThis
       arch: 'wasm32',
       neon: false,
       avx2: false,
+      wasmSimd: true,
       threadCount: detectWebThreadCount(scope),
     },
     gpu: {

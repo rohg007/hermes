@@ -10,6 +10,7 @@ import {
   toDownloadRequest,
 } from './modelSource';
 import { parseNativeJson, stringifyNativeJson } from './nativeJson';
+import { logPerformanceAuditLoad } from './performanceAudit';
 import type {
   BitNetConfiguration,
   CachedModel,
@@ -104,6 +105,18 @@ export class BitNet {
   ): Promise<BitNetModel> {
     try {
       const resolved = await this.resolveModelForLoad(modelIdOrPath, options);
+      const config = getBitNetConfig();
+      const requestedRuntime = options.runtime ?? getDefaultRuntime();
+      const contextSize = options.contextSize ?? 2048;
+      const requestedThreads = options.threads ?? 0;
+      let capabilities: RuntimeCapabilities | undefined;
+      if (config.performanceAudit) {
+        try {
+          capabilities = await this.capabilities();
+        } catch (error) {
+          getBitNetLogger().warn(`performance audit could not read runtime capabilities: ${String(error)}`);
+        }
+      }
       const response = parseNativeJson<{
         handle: string;
         id: string;
@@ -115,9 +128,9 @@ export class BitNet {
           resolved.path,
           stringifyNativeJson({
             id: resolved.id,
-            runtime: options.runtime ?? getDefaultRuntime(),
-            contextSize: options.contextSize ?? 2048,
-            threads: options.threads ?? 0,
+            runtime: requestedRuntime,
+            contextSize,
+            threads: requestedThreads,
             keepInMemory: options.keepInMemory ?? true,
           })
         ),
@@ -127,6 +140,17 @@ export class BitNet {
       getBitNetLogger().info(`runtime selected: ${response.runtimeUsed}`);
       for (const warning of response.warnings ?? []) {
         getBitNetLogger().warn(warning);
+      }
+      if (config.performanceAudit && capabilities) {
+        logPerformanceAuditLoad({
+          modelId: response.id,
+          path: response.path,
+          requestedRuntime,
+          runtimeUsed: response.runtimeUsed,
+          contextSize,
+          requestedThreads,
+          capabilities,
+        });
       }
 
       return new BitNetModel(response);
