@@ -148,6 +148,34 @@ if (models.length > 0) {
 }
 ```
 
+### Error Handling
+
+SDK errors are typed and include actionable messages. Catch `BitNetError` when you need error-code handling:
+
+```ts
+import { BitNetError, InferenceCancelledError } from '@bitnet/react-native';
+
+try {
+  const model = await BitNet.load();
+  for await (const token of model.chat({
+    messages: [{ role: 'user', content: 'Hello' }],
+  })) {
+    console.log(token);
+  }
+} catch (error) {
+  if (error instanceof InferenceCancelledError) {
+    return;
+  }
+  if (error instanceof BitNetError) {
+    console.warn(error.code, error.message);
+    return;
+  }
+  throw error;
+}
+```
+
+Common codes: `BITNET_NATIVE_UNAVAILABLE`, `BITNET_MODEL_NOT_FOUND`, `BITNET_MODEL_INCOMPATIBLE`, `BITNET_INFERENCE_BUSY`, `BITNET_DOWNLOAD_FAILED`.
+
 ### Cancellation
 
 ```ts
